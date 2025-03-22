@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet Map Styles */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+.leaflet-popup-close-button {
+  color: #4F46E5;
+}
+
+.leaflet-popup-tip {
+  background-color: white;
+}
+
+/* FullCalendar Customization */
+.fc {
+  @apply font-sans;
+}
+
+.fc .fc-toolbar-title {
+  @apply text-xl font-bold text-gray-900;
+}
+
+.fc .fc-button {
+  @apply bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  @apply bg-indigo-600 border-indigo-600 text-white;
+}
+
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion {
+  @apply text-gray-700;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+  @apply bg-indigo-50;
+}
+
+.fc .fc-event {
+  @apply cursor-pointer border-0 rounded-md shadow-sm;
+}
+
+.fc .fc-event-title {
+  @apply font-medium;
+}
+
+.fc .fc-event-time {
+  @apply font-normal;
+}
+
+.fc .fc-timegrid-slot-label {
+  @apply text-gray-500;
+}
+
+.fc .fc-timegrid-axis {
+  @apply text-gray-400;
+}
