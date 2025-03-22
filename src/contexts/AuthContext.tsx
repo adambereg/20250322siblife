@@ -7,7 +7,7 @@ import {
   RegisterData,
   User
 } from '../types/auth';
-import { authAPI } from '../api';
+import { authAPI } from '../api/client';
 
 // Начальное состояние авторизации
 const initialState: AuthState = {

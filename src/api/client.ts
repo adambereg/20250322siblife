@@ -2,8 +2,8 @@ import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'ax
 import { LoginCredentials, RegisterData, User } from '../types/auth';
 
 // Определяем базовый URL для API
-// Используем localhost:3000 для API и localhost:5173 для клиента
-const API_BASE_URL = 'http://localhost:3000/api';
+// Используем localhost:5173 для API (так как сервер на том же порту)
+const API_BASE_URL = 'http://localhost:5173/api';
 
 // Создаем инстанс axios с базовым URL
 const API = axios.create({
@@ -174,6 +174,4 @@ export const eventsAPI = {
       return { success: false, message: 'Не удалось соединиться с сервером' };
     }
   },
-};
-
-export default API; 
+}; 

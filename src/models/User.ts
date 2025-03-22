@@ -1,31 +1,30 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
 import { UserRole } from '../types/auth';
 
-// Расширяем тип Document для нашей модели пользователя
+// Интерфейс для документа пользователя в MongoDB
 export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  avatar?: string;
   role: UserRole;
+  avatar?: string;
   joinDate: Date;
   tokens: number;
-  friends?: number;
-  followers?: number;
-  stats?: {
-    events?: number;
-    reviews?: number;
-    posts?: number;
+  friends: number;
+  followers: number;
+  stats: {
+    events: number;
+    reviews: number;
+    posts: number;
   };
-  lastLogin?: Date;
 }
 
 // Схема пользователя
-const UserSchema = new Schema<IUser>({
+const UserSchema: Schema = new Schema({
   name: {
     type: String,
     required: [true, 'Имя обязательно'],
-    trim: true,
+    trim: true
   },
   email: {
     type: String,
@@ -33,66 +32,62 @@ const UserSchema = new Schema<IUser>({
     unique: true,
     trim: true,
     lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Введите корректный email'],
+    match: [/^\S+@\S+\.\S+$/, 'Некорректный формат email']
   },
   password: {
     type: String,
     required: [true, 'Пароль обязателен'],
-    minlength: [8, 'Пароль должен содержать не менее 8 символов'],
-  },
-  avatar: {
-    type: String,
-    default: '',
+    minlength: [6, 'Пароль должен быть не менее 6 символов']
   },
   role: {
     type: String,
-    enum: {
-      values: ['participant', 'vip', 'pro', 'business', 'admin'],
-      message: 'Недопустимый тип аккаунта',
-    },
-    default: 'participant',
+    enum: ['participant', 'vip', 'pro', 'business', 'admin'],
+    default: 'participant'
+  },
+  avatar: {
+    type: String,
+    default: ''
   },
   joinDate: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
   tokens: {
     type: Number,
-    default: 50,
+    default: 50
   },
   friends: {
     type: Number,
-    default: 0,
+    default: 0
   },
   followers: {
     type: Number,
-    default: 0,
+    default: 0
   },
   stats: {
     events: {
       type: Number,
-      default: 0,
+      default: 0
     },
     reviews: {
       type: Number,
-      default: 0,
+      default: 0
     },
     posts: {
       type: Number,
-      default: 0,
-    },
-  },
-  lastLogin: {
-    type: Date,
-  },
+      default: 0
+    }
+  }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
-// Добавим метод для сравнения хешированных паролей в будущем
-// UserSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
-//   return await bcrypt.compare(candidatePassword, this.password);
-// };
+// Метод для удаления пароля при сериализации пользователя
+UserSchema.methods.toJSON = function() {
+  const user = this.toObject();
+  delete user.password;
+  return user;
+};
 
-// Создаем и экспортируем модель
+// Создаем модель
 export default mongoose.model<IUser>('User', UserSchema); 

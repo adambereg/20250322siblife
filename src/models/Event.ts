@@ -8,6 +8,28 @@ export enum EventStatus {
   COMPLETED = 'completed'
 }
 
+// Геолокация
+interface ILocation {
+  address: string;
+  city: string;
+  coordinates?: [number, number]; // [долгота, широта]
+}
+
+// Участник события
+interface IParticipant {
+  user: mongoose.Types.ObjectId;
+  status: 'registered' | 'attended' | 'canceled';
+  registrationDate: Date;
+}
+
+// Отзыв о событии
+interface IReview {
+  user: mongoose.Types.ObjectId;
+  rating: number;
+  comment: string;
+  date: Date;
+}
+
 // Интерфейс для модели события
 export interface IEvent extends Document {
   title: string;
@@ -17,15 +39,7 @@ export interface IEvent extends Document {
   images: string[];
   organizer: mongoose.Types.ObjectId;
   clan?: mongoose.Types.ObjectId;
-  location: {
-    address: string;
-    city: string;
-    region?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    }
-  };
+  location: ILocation;
   startDate: Date;
   endDate: Date;
   category: string[];
@@ -41,12 +55,72 @@ export interface IEvent extends Document {
     registered: number;
   };
   status: EventStatus;
-  participants: mongoose.Types.ObjectId[];
+  participants: IParticipant[];
   interested: mongoose.Types.ObjectId[];
   visibility: 'public' | 'private' | 'clan-only';
+  reviews: IReview[];
+  viewCount: number;
+  avgRating: number;
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Схема локации
+const LocationSchema = new Schema<ILocation>({
+  address: {
+    type: String,
+    required: [true, 'Адрес обязателен']
+  },
+  city: {
+    type: String,
+    required: [true, 'Город обязателен']
+  },
+  coordinates: {
+    type: [Number],
+    index: '2dsphere'
+  }
+});
+
+// Схема участника
+const ParticipantSchema = new Schema<IParticipant>({
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['registered', 'attended', 'canceled'],
+    default: 'registered'
+  },
+  registrationDate: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Схема отзыва
+const ReviewSchema = new Schema<IReview>({
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  rating: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 5
+  },
+  comment: {
+    type: String,
+    required: true
+  },
+  date: {
+    type: Date,
+    default: Date.now
+  }
+});
 
 // Схема события
 const EventSchema = new Schema<IEvent>({
@@ -83,23 +157,7 @@ const EventSchema = new Schema<IEvent>({
     type: Schema.Types.ObjectId,
     ref: 'Clan',
   },
-  location: {
-    address: {
-      type: String,
-      required: [true, 'Адрес обязателен'],
-    },
-    city: {
-      type: String,
-      required: [true, 'Город обязателен'],
-    },
-    region: {
-      type: String,
-    },
-    coordinates: {
-      lat: Number,
-      lng: Number,
-    },
-  },
+  location: LocationSchema,
   startDate: {
     type: Date,
     required: [true, 'Дата начала обязательна'],
@@ -146,10 +204,7 @@ const EventSchema = new Schema<IEvent>({
     enum: Object.values(EventStatus),
     default: EventStatus.DRAFT,
   },
-  participants: [{
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-  }],
+  participants: [ParticipantSchema],
   interested: [{
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -158,13 +213,33 @@ const EventSchema = new Schema<IEvent>({
     type: String,
     enum: ['public', 'private', 'clan-only'],
     default: 'public',
+  },
+  reviews: [ReviewSchema],
+  viewCount: {
+    type: Number,
+    default: 0
+  },
+  avgRating: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true,
 });
 
-// Пре-хук для генерации слага из названия события
+// Создание индекса для полнотекстового поиска
+EventSchema.index({ 
+  title: 'text', 
+  description: 'text',
+  tags: 'text'
+});
+
+// Автоматический пересчет средней оценки при добавлении отзыва
 EventSchema.pre('save', function(next) {
+  if (this.reviews?.length > 0) {
+    const totalRating = this.reviews.reduce((sum, review) => sum + review.rating, 0);
+    this.avgRating = totalRating / this.reviews.length;
+  }
   if (this.isNew || this.isModified('title')) {
     this.slug = this.title
       .toLowerCase()

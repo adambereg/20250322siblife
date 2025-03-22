@@ -1,26 +1,48 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
 
-// Интерфейс для модели клана
+// Интерфейс для участника клана
+interface IClanMember {
+  user: mongoose.Types.ObjectId;
+  role: 'leader' | 'moderator' | 'member';
+  joinDate: Date;
+}
+
+// Интерфейс для документа клана в MongoDB
 export interface IClan extends Document {
   name: string;
   slug: string;
   description: string;
   logo: string;
-  coverImage: string;
-  founder: mongoose.Types.ObjectId;
-  members: mongoose.Types.ObjectId[];
-  level: number;
-  points: number;
-  isVerified: boolean;
-  location: {
-    city: string;
-    region?: string;
-  };
+  cover: string;
+  creator: mongoose.Types.ObjectId;
+  members: IClanMember[];
+  memberCount: number;
   tags: string[];
-  rules?: string;
+  category: string;
+  city: string;
+  isVerified: boolean;
+  isPrivate: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Схема участника клана
+const ClanMemberSchema = new Schema<IClanMember>({
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  role: {
+    type: String,
+    enum: ['leader', 'moderator', 'member'],
+    default: 'member'
+  },
+  joinDate: {
+    type: Date,
+    default: Date.now
+  }
+});
 
 // Схема клана
 const ClanSchema = new Schema<IClan>({
@@ -28,81 +50,73 @@ const ClanSchema = new Schema<IClan>({
     type: String,
     required: [true, 'Название клана обязательно'],
     trim: true,
-    unique: true,
-    maxlength: [50, 'Название клана не должно превышать 50 символов'],
+    unique: true
   },
   slug: {
     type: String,
     required: true,
     unique: true,
-    lowercase: true,
-    trim: true,
+    lowercase: true
   },
   description: {
     type: String,
-    required: [true, 'Описание клана обязательно'],
-    maxlength: [1000, 'Описание не должно превышать 1000 символов'],
+    required: [true, 'Описание клана обязательно']
   },
   logo: {
     type: String,
-    default: '',
+    default: ''
   },
-  coverImage: {
+  cover: {
     type: String,
-    default: '',
+    default: ''
   },
-  founder: {
+  creator: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: true
   },
-  members: [{
-    type: Schema.Types.ObjectId,
-    ref: 'User',
+  members: [ClanMemberSchema],
+  memberCount: {
+    type: Number,
+    default: 1 // Создатель клана автоматически становится первым участником
+  },
+  tags: [{
+    type: String
   }],
-  level: {
-    type: Number,
-    default: 1,
-    min: [1, 'Уровень клана не может быть меньше 1'],
+  category: {
+    type: String,
+    required: [true, 'Категория клана обязательна']
   },
-  points: {
-    type: Number,
-    default: 0,
+  city: {
+    type: String,
+    required: [true, 'Город обязателен']
   },
   isVerified: {
     type: Boolean,
-    default: false,
+    default: false
   },
-  location: {
-    city: {
-      type: String,
-      required: [true, 'Город обязателен'],
-    },
-    region: {
-      type: String,
-    },
-  },
-  tags: [{
-    type: String,
-    trim: true,
-  }],
-  rules: {
-    type: String,
-  },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
-// Пре-хук для генерации слага из названия клана
+// Создание индекса для полнотекстового поиска
+ClanSchema.index({ 
+  name: 'text', 
+  description: 'text',
+  tags: 'text'
+});
+
+// Автоматический пересчет количества участников при изменении массива members
 ClanSchema.pre('save', function(next) {
-  if (this.isNew || this.isModified('name')) {
-    this.slug = this.name
-      .toLowerCase()
-      .replace(/[^\w\sа-яА-Я]/g, '')
-      .replace(/\s+/g, '-');
+  if (this.isModified('members')) {
+    this.memberCount = this.members.length;
   }
   next();
 });
 
-// Создаем и экспортируем модель
+// Создаем модель
 export default mongoose.model<IClan>('Clan', ClanSchema); 
