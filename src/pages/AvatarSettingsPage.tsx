@@ -75,6 +75,13 @@ const AvatarSettingsPage: React.FC = () => {
       
       // Проверка содержимого FormData
       console.log('Файл в FormData:', avatar.name, avatar.type, avatar.size);
+
+      // Проверяем заголовки запроса
+      const requestHeaders = {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      };
+      console.log('Заголовки запроса:', requestHeaders);
       
       console.log('Отправка аватара на сервер...');
       const response = await userAPI.updateProfileWithAvatar(formData);

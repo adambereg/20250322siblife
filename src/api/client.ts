@@ -22,7 +22,14 @@ API.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  console.log(`🚀 Запрос: ${config.method?.toUpperCase()} ${config.url}`, config.data || '');
+  
+  // Не удаляем Content-Type для multipart/form-data запросов
+  if (config.data instanceof FormData) {
+    console.log('Отправка FormData - сохраняем заголовок Content-Type для multipart/form-data');
+    // Axios автоматически установит правильный Content-Type для FormData
+  }
+  
+  console.log(`🚀 Запрос: ${config.method?.toUpperCase()} ${config.url}`, config.data || '', 'Заголовки:', config.headers);
   return config;
 });
 
@@ -206,6 +213,7 @@ export const userAPI = {
       const { data } = await API.put<ApiResponse<User>>('/users/profile/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          // Все остальные заголовки добавятся автоматически через интерцептор
         },
       });
       
@@ -215,10 +223,10 @@ export const userAPI = {
       console.error('Ошибка при загрузке аватара:', error);
       
       if (error.response) {
-        console.error('Детали ответа сервера:', error.response.data);
+        console.error('Детали ответа сервера:', error.response.data, 'Статус:', error.response.status);
         return { 
           success: false, 
-          message: error.response.data.message || 'Ошибка загрузки аватара'
+          message: error.response.data.message || `Ошибка загрузки аватара (${error.response.status})`
         };
       }
       

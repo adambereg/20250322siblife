@@ -13,7 +13,7 @@ dotenv.config();
 
 // Инициализируем Express
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = 5000;
 console.log(`Порт сервера установлен на: ${PORT}`);
 
 // Создаем директорию для загрузок, если она не существует
@@ -437,12 +437,16 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // Обновление профиля пользователя (без аватара)
 app.put('/api/users/profile', authMiddleware, async (req, res) => {
   console.log('Получен запрос на обновление профиля без аватара');
+  console.log('Тело запроса:', req.body);
+  console.log('ID пользователя из токена:', req.userId);
+  
   try {
     const { name } = req.body;
     console.log('Данные для обновления:', { name });
     
     // Проверяем, что есть данные для обновления
     if (!name) {
+      console.log('Отсутствуют данные для обновления');
       return res.status(400).json({
         success: false,
         message: 'Отсутствуют данные для обновления'
@@ -450,30 +454,59 @@ app.put('/api/users/profile', authMiddleware, async (req, res) => {
     }
     
     // Находим и обновляем пользователя
-    const user = await User.findByIdAndUpdate(
-      req.userId, 
-      { name },
-      { new: true, runValidators: true }
-    ).select('-password');
+    let updatedUser;
+    if (mongoose.connection.readyState === 1) { // Если MongoDB подключена
+      try {
+        updatedUser = await User.findByIdAndUpdate(
+          req.userId, 
+          { name },
+          { new: true, runValidators: true }
+        ).select('-password');
+      } catch (dbError) {
+        console.error('Ошибка базы данных:', dbError);
+        return res.status(500).json({
+          success: false,
+          message: 'Ошибка базы данных: ' + dbError.message
+        });
+      }
+    } else {
+      // Используем моковые данные, если нет подключения к MongoDB
+      const mockEmail = 'adambereg@gmail.com'; // Предполагаем, что это текущий пользователь
+      console.log('Используем моковые данные для пользователя:', mockEmail);
+      
+      if (mockUsers[mockEmail]) {
+        mockUsers[mockEmail].name = name;
+        updatedUser = { ...mockUsers[mockEmail] };
+        delete updatedUser.password;
+        console.log('Пользователь в моковых данных обновлен:', updatedUser);
+      } else {
+        console.error('Пользователь не найден в моковых данных');
+        return res.status(404).json({
+          success: false,
+          message: 'Пользователь не найден'
+        });
+      }
+    }
     
-    if (!user) {
+    if (!updatedUser) {
+      console.log('Пользователь не найден в базе данных');
       return res.status(404).json({
         success: false,
         message: 'Пользователь не найден'
       });
     }
     
-    console.log('Профиль успешно обновлен для пользователя:', user.email);
-    res.json({
+    console.log('Профиль успешно обновлен:', updatedUser);
+    return res.json({
       success: true,
-      data: user,
+      data: updatedUser,
       message: 'Профиль успешно обновлен'
     });
   } catch (error) {
     console.error('Ошибка при обновлении профиля:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Ошибка сервера при обновлении профиля'
+      message: 'Ошибка сервера при обновлении профиля: ' + error.message
     });
   }
 });
@@ -481,9 +514,12 @@ app.put('/api/users/profile', authMiddleware, async (req, res) => {
 // Обновление аватара пользователя
 app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
   console.log('Получен запрос на обновление аватара');
+  console.log('ID пользователя из токена:', req.userId);
   
   // Логируем заголовки запроса
   console.log('Заголовки запроса:', req.headers);
+  console.log('Тело запроса (если есть):', req.body);
+  console.log('Файлы (если есть):', req.file || 'нет файлов');
   
   try {
     // Проверяем загрузку файла
@@ -495,8 +531,30 @@ app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), as
     console.log('Файл успешно загружен:', req.file);
     console.log('Путь к файлу:', req.file.path);
     
-    // Получаем пользователя из базы данных
-    const user = await User.findById(req.userId);
+    // Получаем пользователя из базы данных или моковых данных
+    let user;
+    if (mongoose.connection.readyState === 1) { // Если MongoDB подключена
+      try {
+        user = await User.findById(req.userId);
+      } catch (dbError) {
+        console.error('Ошибка базы данных:', dbError);
+        return res.status(500).json({
+          success: false,
+          message: 'Ошибка базы данных: ' + dbError.message
+        });
+      }
+    } else {
+      // Используем моковые данные, если нет подключения к MongoDB
+      const mockEmail = 'adambereg@gmail.com'; // Предполагаем, что это текущий пользователь
+      console.log('Используем моковые данные для пользователя:', mockEmail);
+      
+      if (mockUsers[mockEmail]) {
+        user = mockUsers[mockEmail];
+        console.log('Пользователь найден в моковых данных:', user);
+      } else {
+        console.error('Пользователь не найден в моковых данных');
+      }
+    }
     
     if (!user) {
       // Если пользователь не найден, удаляем загруженный файл
@@ -526,24 +584,37 @@ app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), as
     
     // Обновляем аватар пользователя
     user.avatar = avatarUrl;
-    await user.save();
-    console.log('Аватар успешно обновлен для пользователя:', user.email);
+    
+    // Сохраняем изменения
+    let savedUser;
+    if (mongoose.connection.readyState === 1) {
+      savedUser = await user.save();
+      console.log('Аватар успешно обновлен в MongoDB для пользователя:', user.email);
+    } else {
+      // В случае моковых данных, просто обновляем их
+      savedUser = user;
+      console.log('Аватар успешно обновлен в моковых данных для пользователя:', user.email);
+    }
+    
+    // Подготавливаем данные для ответа (без пароля)
+    const userData = {
+      id: savedUser._id || savedUser.id,
+      name: savedUser.name,
+      email: savedUser.email,
+      role: savedUser.role,
+      avatar: savedUser.avatar,
+      joinDate: savedUser.joinDate,
+      tokens: savedUser.tokens,
+      friends: savedUser.friends,
+      followers: savedUser.followers,
+      stats: savedUser.stats
+    };
     
     // Возвращаем обновленные данные пользователя
+    console.log('Отправляем успешный ответ с данными пользователя:', userData);
     return res.json({
       success: true,
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-        joinDate: user.joinDate,
-        tokens: user.tokens,
-        friends: user.friends,
-        followers: user.followers,
-        stats: user.stats
-      },
+      data: userData,
       message: 'Аватар успешно обновлен'
     });
   } catch (error) {
@@ -637,6 +708,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Запускаем сервер
-app.listen(5000, () => {
-  console.log(`Сервер запущен на порту: 5000`);
+app.listen(PORT, () => {
+  console.log(`Сервер запущен на порту: ${PORT}`);
 }); 

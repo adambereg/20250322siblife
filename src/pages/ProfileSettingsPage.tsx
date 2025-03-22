@@ -61,50 +61,27 @@ const ProfileSettingsPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
-    
     setLoading(true);
     setError(null);
     setSuccess(false);
     
     try {
-      // Формируем данные для отправки
-      const updateData: any = { ...formData };
+      console.log('Отправка запроса на обновление профиля:', formData);
+      const response = await userAPI.updateProfile({
+        name: formData.name,
+      });
+      console.log('Ответ от сервера:', response);
       
-      // Если есть аватар, используем FormData для отправки файла
-      if (avatar) {
-        const formDataWithFile = new FormData();
-        formDataWithFile.append('avatar', avatar);
-        
-        // Добавляем остальные поля
-        Object.keys(updateData).forEach(key => {
-          if (updateData[key] !== undefined) {
-            formDataWithFile.append(key, updateData[key]);
-          }
-        });
-        
-        const response = await userAPI.updateProfileWithAvatar(formDataWithFile);
-        
-        if (response.success) {
-          setSuccess(true);
-          // Обновляем данные пользователя в контексте
-          await updateUserData();
-        } else {
-          setError(response.message || 'Не удалось обновить профиль');
-        }
+      if (response.success) {
+        setSuccess(true);
+        // Обновляем данные пользователя в контексте
+        await updateUserData();
       } else {
-        // Если аватар не менялся, отправляем только данные
-        const response = await userAPI.updateProfile(updateData);
-        
-        if (response.success) {
-          setSuccess(true);
-          // Обновляем данные пользователя в контексте
-          await updateUserData();
-        } else {
-          setError(response.message || 'Не удалось обновить профиль');
-        }
+        setError(response.message || 'Не удалось обновить профиль');
+        console.error('Ошибка обновления профиля:', response.message);
       }
     } catch (err: any) {
+      console.error('Исключение при обновлении профиля:', err);
       setError(err.message || 'Произошла ошибка при обновлении профиля');
     } finally {
       setLoading(false);
