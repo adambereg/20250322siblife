@@ -2,6 +2,7 @@ import React from 'react';
 import { User } from '../types/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { LogOut, User as UserIcon, Settings, Bell, Calendar, MapPin, ShoppingBag, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface UserProfileProps {
   className?: string;
@@ -106,36 +107,36 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
         </div>
 
         {/* Навигация */}
-        <div className="grid grid-cols-2 gap-3">
-          <a href="/profile/events" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
+        <div className="space-y-1 mb-6">
+          <Link to="/profile/events" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
             <Calendar className="h-5 w-5 text-indigo-500 mr-3" />
             <span className="text-gray-700">Мои события</span>
-          </a>
-          <a href="/profile/places" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
+          </Link>
+          <Link to="/profile/places" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
             <MapPin className="h-5 w-5 text-indigo-500 mr-3" />
             <span className="text-gray-700">Избранные места</span>
-          </a>
-          <a href="/profile/market" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
+          </Link>
+          <Link to="/profile/market" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
             <ShoppingBag className="h-5 w-5 text-indigo-500 mr-3" />
             <span className="text-gray-700">Маркетплейс</span>
-          </a>
-          <a href="/profile/network" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
+          </Link>
+          <Link to="/profile/network" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
             <Users className="h-5 w-5 text-indigo-500 mr-3" />
             <span className="text-gray-700">Мое окружение</span>
-          </a>
-          <a href="/profile/notifications" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
+          </Link>
+          <Link to="/profile/notifications" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
             <Bell className="h-5 w-5 text-indigo-500 mr-3" />
             <span className="text-gray-700">Уведомления</span>
-          </a>
-          <a href="/profile/settings" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
+          </Link>
+          <Link to="/profile/settings" className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition">
             <Settings className="h-5 w-5 text-indigo-500 mr-3" />
             <span className="text-gray-700">Настройки</span>
-          </a>
+          </Link>
         </div>
       </div>
       
       {/* Нижняя панель */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
         <button 
           onClick={handleLogout}
           className="flex items-center justify-center w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

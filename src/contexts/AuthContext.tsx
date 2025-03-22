@@ -19,9 +19,9 @@ const initialState: AuthState = {
 
 // Типы действий для reducer
 type AuthAction =
-  | { type: 'LOGIN_START' | 'REGISTER_START' | 'LOGOUT' | 'CLEAR_ERROR' | 'AUTH_CHECK_START' }
-  | { type: 'LOGIN_SUCCESS' | 'REGISTER_SUCCESS' | 'AUTH_CHECK_SUCCESS'; payload: User }
-  | { type: 'LOGIN_FAILURE' | 'REGISTER_FAILURE' | 'AUTH_CHECK_FAILURE'; payload: string };
+  | { type: 'LOGIN_START' | 'REGISTER_START' | 'LOGOUT' | 'CLEAR_ERROR' | 'AUTH_CHECK_START' | 'UPDATE_PROFILE_START' }
+  | { type: 'LOGIN_SUCCESS' | 'REGISTER_SUCCESS' | 'AUTH_CHECK_SUCCESS' | 'UPDATE_PROFILE_SUCCESS'; payload: User }
+  | { type: 'LOGIN_FAILURE' | 'REGISTER_FAILURE' | 'AUTH_CHECK_FAILURE' | 'UPDATE_PROFILE_FAILURE'; payload: string };
 
 // Редьюсер для управления состоянием авторизации
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -29,6 +29,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'LOGIN_START':
     case 'REGISTER_START':
     case 'AUTH_CHECK_START':
+    case 'UPDATE_PROFILE_START':
       return {
         ...state,
         loading: true,
@@ -37,6 +38,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'LOGIN_SUCCESS':
     case 'REGISTER_SUCCESS':
     case 'AUTH_CHECK_SUCCESS':
+    case 'UPDATE_PROFILE_SUCCESS':
       return {
         ...state,
         isAuthenticated: true,
@@ -47,6 +49,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'LOGIN_FAILURE':
     case 'REGISTER_FAILURE':
     case 'AUTH_CHECK_FAILURE':
+    case 'UPDATE_PROFILE_FAILURE':
       return {
         ...state,
         isAuthenticated: false,
@@ -159,8 +162,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
 
+  // Функция для обновления данных пользователя в контексте
+  const updateUserData = useCallback(async () => {
+    dispatch({ type: 'UPDATE_PROFILE_START' });
+
+    try {
+      const response = await authAPI.getCurrentUser();
+      if (response.success && response.data) {
+        dispatch({ type: 'UPDATE_PROFILE_SUCCESS', payload: response.data });
+        return true;
+      } else {
+        dispatch({ 
+          type: 'UPDATE_PROFILE_FAILURE', 
+          payload: response.message || 'Не удалось обновить данные профиля' 
+        });
+        return false;
+      }
+    } catch (error) {
+      dispatch({ 
+        type: 'UPDATE_PROFILE_FAILURE', 
+        payload: 'Произошла ошибка при обновлении данных. Попробуйте позже.' 
+      });
+      return false;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ authState, login, register, logout, clearError }}>
+    <AuthContext.Provider value={{ 
+      authState, 
+      login, 
+      register, 
+      logout, 
+      clearError,
+      updateUserData
+    }}>
       {children}
     </AuthContext.Provider>
   );

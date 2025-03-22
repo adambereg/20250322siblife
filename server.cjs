@@ -3,6 +3,10 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const mongoose = require('mongoose');
+const multer = require('multer');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -19,6 +23,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Статический доступ к загруженным файлам
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Добавляем логирование запросов
 app.use((req, res, next) => {
@@ -85,6 +92,70 @@ try {
 } catch (error) {
   console.error('Ошибка загрузки моделей MongoDB:', error);
 }
+
+// Настройка multer для загрузки файлов
+const uploadDir = path.join(__dirname, 'uploads');
+// Создаем директорию, если она не существует
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Настройка хранилища multer
+const storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function(req, file, cb) {
+    // Генерируем уникальное имя, сохраняя расширение файла
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'avatar-' + uniqueSuffix + ext);
+  }
+});
+
+// Функция фильтрации файлов по типу
+const fileFilter = (req, file, cb) => {
+  // Принимаем только изображения
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Разрешены только изображения (JPEG, PNG, GIF)'), false);
+  }
+};
+
+// Создаем экземпляр multer
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 МБ
+  }
+});
+
+// Middleware для проверки JWT токена
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      success: false,
+      message: 'Не авторизован, токен отсутствует'
+    });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+    req.userId = decoded.id;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Неверный или просроченный токен'
+    });
+  }
+};
 
 // Маршруты API
 // Если модули ES, пытаемся их импортировать с помощью ESM Loader
@@ -313,6 +384,181 @@ try {
     });
   });
 }
+
+// Get current user (me)
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Пользователь не найден'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении данных пользователя'
+    });
+  }
+});
+
+// Обновление профиля пользователя (без аватара)
+app.put('/api/users/profile', authMiddleware, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    // Проверяем, что есть данные для обновления
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Отсутствуют данные для обновления'
+      });
+    }
+    
+    // Находим и обновляем пользователя
+    const user = await User.findByIdAndUpdate(
+      req.userId, 
+      { name },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Пользователь не найден'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user,
+      message: 'Профиль успешно обновлен'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при обновлении профиля'
+    });
+  }
+});
+
+// Обновление аватара пользователя
+app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
+  try {
+    // Проверяем, был ли загружен файл
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Файл аватара не был загружен'
+      });
+    }
+    
+    // Формируем URL для аватара
+    const avatarUrl = `/uploads/${req.file.filename}`;
+    
+    // Обновляем другие данные профиля, если они есть
+    const updateData = { avatar: avatarUrl };
+    if (req.body.name) {
+      updateData.name = req.body.name;
+    }
+    
+    // Находим и обновляем пользователя
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!user) {
+      // Если пользователь не найден, удаляем загруженный файл
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'Пользователь не найден'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user,
+      message: 'Аватар успешно обновлен'
+    });
+  } catch (error) {
+    // В случае ошибки, удаляем загруженный файл, если он есть
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при обновлении аватара'
+    });
+  }
+});
+
+// Изменение пароля
+app.put('/api/users/password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    // Проверяем, что все необходимые поля присутствуют
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Пожалуйста, укажите текущий и новый пароль'
+      });
+    }
+    
+    // Проверяем, что новый пароль достаточно длинный
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Новый пароль должен содержать не менее 6 символов'
+      });
+    }
+    
+    // Находим пользователя с паролем
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Пользователь не найден'
+      });
+    }
+    
+    // Проверяем текущий пароль
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Неверный текущий пароль'
+      });
+    }
+    
+    // Хешируем новый пароль
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
+    // Сохраняем пользователя с новым паролем
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Пароль успешно изменен'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при изменении пароля'
+    });
+  }
+});
 
 // Сервируем статические файлы клиента в prod-режиме
 if (process.env.NODE_ENV === 'production') {

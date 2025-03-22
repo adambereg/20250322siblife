@@ -19,6 +19,9 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RolesPage from './pages/RolesPage';
 import ProfilePage from './pages/ProfilePage';
+import ProfileSettingsPage from './pages/ProfileSettingsPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
+import AvatarSettingsPage from './pages/AvatarSettingsPage';
 import AccessDeniedPage from './pages/AccessDeniedPage';
 import VIPProfilePage from './pages/VIPProfilePage';
 import PROProfilePage from './pages/PROProfilePage';
@@ -106,6 +109,9 @@ const App: React.FC = () => {
           {/* Защищенные маршруты */}
           <Route element={<PrivateRoute />}>
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/settings" element={<ProfileSettingsPage />} />
+            <Route path="/profile/settings/password" element={<ChangePasswordPage />} />
+            <Route path="/profile/settings/avatar" element={<AvatarSettingsPage />} />
           </Route>
           
           <Route element={<PrivateRoute allowedRoles={['vip', 'pro', 'admin']} />}>

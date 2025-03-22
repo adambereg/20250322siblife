@@ -173,4 +173,50 @@ export const eventsAPI = {
       return { success: false, message: 'Не удалось соединиться с сервером' };
     }
   },
+};
+
+// API для работы с пользователями
+export const userAPI = {
+  // Обновление профиля пользователя (без аватара)
+  updateProfile: async (userData: Partial<User>): Promise<ApiResponse<User>> => {
+    try {
+      const { data } = await API.put<ApiResponse<User>>('/users/profile', userData);
+      return data;
+    } catch (error: any) {
+      if (error.response) {
+        return { success: false, message: error.response.data.message || 'Ошибка обновления профиля' };
+      }
+      return { success: false, message: 'Не удалось соединиться с сервером' };
+    }
+  },
+
+  // Обновление профиля с аватаром (используем FormData)
+  updateProfileWithAvatar: async (formData: FormData): Promise<ApiResponse<User>> => {
+    try {
+      const { data } = await API.put<ApiResponse<User>>('/users/profile/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return data;
+    } catch (error: any) {
+      if (error.response) {
+        return { success: false, message: error.response.data.message || 'Ошибка загрузки аватара' };
+      }
+      return { success: false, message: 'Не удалось соединиться с сервером' };
+    }
+  },
+
+  // Изменение пароля пользователя
+  changePassword: async (passwordData: { currentPassword: string, newPassword: string }): Promise<ApiResponse<User>> => {
+    try {
+      const { data } = await API.put<ApiResponse<User>>('/users/password', passwordData);
+      return data;
+    } catch (error: any) {
+      if (error.response) {
+        return { success: false, message: error.response.data.message || 'Ошибка изменения пароля' };
+      }
+      return { success: false, message: 'Не удалось соединиться с сервером' };
+    }
+  },
 }; 
