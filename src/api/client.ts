@@ -193,17 +193,37 @@ export const userAPI = {
   // Обновление профиля с аватаром (используем FormData)
   updateProfileWithAvatar: async (formData: FormData): Promise<ApiResponse<User>> => {
     try {
+      console.log('Отправка FormData на сервер');
+      
+      // Проверим содержимое FormData для отладки
+      console.log('FormData содержит следующие поля:');
+      for (const pair of formData.entries()) {
+        console.log(`- ${pair[0]}: ${pair[1] instanceof File ? `Файл (${(pair[1] as File).name})` : pair[1]}`);
+      }
+      
       const { data } = await API.put<ApiResponse<User>>('/users/profile/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
+      
+      console.log('Ответ сервера на обновление аватара:', data);
       return data;
     } catch (error: any) {
+      console.error('Ошибка при загрузке аватара:', error);
+      
       if (error.response) {
-        return { success: false, message: error.response.data.message || 'Ошибка загрузки аватара' };
+        console.error('Детали ответа сервера:', error.response.data);
+        return { 
+          success: false, 
+          message: error.response.data.message || 'Ошибка загрузки аватара'
+        };
       }
-      return { success: false, message: 'Не удалось соединиться с сервером' };
+      
+      return { 
+        success: false, 
+        message: error.message || 'Не удалось соединиться с сервером' 
+      };
     }
   },
 

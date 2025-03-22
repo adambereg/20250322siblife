@@ -12,6 +12,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
   const { authState, logout } = useAuth();
   const { user } = authState;
 
+  // Функция для получения полного URL аватара
+  const getAvatarUrl = (avatarPath: string) => {
+    if (!avatarPath) return 'https://via.placeholder.com/150?text=Нет+фото';
+    // Если это уже полный URL (начинается с http или https)
+    if (avatarPath.startsWith('http')) return avatarPath;
+    // Если это относительный путь с сервера
+    return `http://localhost:5000${avatarPath}`;
+  };
+
   if (!user) {
     return null;
   }
@@ -70,7 +79,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
         <div className="flex items-center px-6 pb-5">
           <div className="relative">
             <img 
-              src={user.avatar || 'https://via.placeholder.com/150'} 
+              src={getAvatarUrl(user.avatar || '')} 
               alt={user.name}
               className="h-24 w-24 rounded-full border-4 border-white object-cover"
             />

@@ -15,15 +15,27 @@ const AvatarSettingsPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Функция для получения полного URL аватара
+  const getAvatarUrl = (avatarPath: string) => {
+    if (!avatarPath) return 'https://via.placeholder.com/150?text=Нет+фото';
+    // Если это уже полный URL (начинается с http или https)
+    if (avatarPath.startsWith('http')) return avatarPath;
+    // Если это относительный путь с сервера
+    return `http://localhost:5000${avatarPath}`;
+  };
+  
   useEffect(() => {
     if (user && user.avatar) {
-      setPreviewUrl(user.avatar);
+      setPreviewUrl(getAvatarUrl(user.avatar));
+    } else {
+      setPreviewUrl('https://via.placeholder.com/150?text=Нет+фото');
     }
   }, [user]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      console.log('Выбран файл:', file.name, 'тип:', file.type, 'размер:', file.size);
       
       // Проверка типа файла
       if (!file.type.match('image.*')) {
@@ -46,26 +58,43 @@ const AvatarSettingsPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !avatar) return;
+    if (!user || !avatar) {
+      setError('Выберите файл для загрузки');
+      return;
+    }
     
     setLoading(true);
     setError(null);
     setSuccess(false);
     
     try {
+      console.log('Подготовка данных для отправки');
+      
       const formData = new FormData();
       formData.append('avatar', avatar);
       
+      // Проверка содержимого FormData
+      console.log('Файл в FormData:', avatar.name, avatar.type, avatar.size);
+      
+      console.log('Отправка аватара на сервер...');
       const response = await userAPI.updateProfileWithAvatar(formData);
+      console.log('Ответ сервера:', response);
       
       if (response.success) {
         setSuccess(true);
+        console.log('Аватар успешно обновлен');
         // Обновляем данные пользователя в контексте
-        await updateUserData();
+        const updated = await updateUserData();
+        if (updated && user.avatar) {
+          // Обновляем локальное превью аватара
+          setPreviewUrl(getAvatarUrl(user.avatar));
+        }
       } else {
         setError(response.message || 'Не удалось обновить аватар');
+        console.error('Ошибка обновления аватара:', response.message);
       }
     } catch (err: any) {
+      console.error('Исключение при загрузке аватара:', err);
       setError(err.message || 'Произошла ошибка при загрузке аватара');
     } finally {
       setLoading(false);
@@ -152,7 +181,7 @@ const AvatarSettingsPage: React.FC = () => {
               <div className="relative mb-6 group">
                 <div className="h-40 w-40 rounded-full overflow-hidden border-4 border-gray-200">
                   <img 
-                    src={previewUrl || 'https://via.placeholder.com/150?text=Нет+фото'} 
+                    src={previewUrl} 
                     alt="Аватар" 
                     className="h-full w-full object-cover"
                   />

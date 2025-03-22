@@ -111,6 +111,15 @@ const ProfileSettingsPage: React.FC = () => {
     }
   };
 
+  // Функция для получения полного URL аватара
+  const getAvatarUrl = (avatarPath: string) => {
+    if (!avatarPath) return 'https://via.placeholder.com/150?text=Нет+фото';
+    // Если это уже полный URL (начинается с http или https)
+    if (avatarPath.startsWith('http')) return avatarPath;
+    // Если это относительный путь с сервера
+    return `http://localhost:5000${avatarPath}`;
+  };
+
   if (!user) {
     return null;
   }
@@ -192,7 +201,7 @@ const ProfileSettingsPage: React.FC = () => {
               <div className="relative mb-3">
                 <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-gray-200">
                   <img 
-                    src={previewUrl || 'https://via.placeholder.com/150?text=Нет+фото'} 
+                    src={getAvatarUrl(user.avatar || '')} 
                     alt="Аватар" 
                     className="h-full w-full object-cover"
                   />

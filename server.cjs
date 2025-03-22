@@ -16,9 +16,25 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 console.log(`Порт сервера установлен на: ${PORT}`);
 
+// Создаем директорию для загрузок, если она не существует
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  console.log('Создание директории uploads:', uploadsDir);
+  fs.mkdirSync(uploadsDir, { recursive: true });
+} else {
+  console.log('Директория uploads уже существует:', uploadsDir);
+  // Проверяем права на запись
+  try {
+    fs.accessSync(uploadsDir, fs.constants.W_OK);
+    console.log('Директория uploads доступна для записи');
+  } catch (err) {
+    console.error('ОШИБКА: Директория uploads недоступна для записи:', err);
+  }
+}
+
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000'],
+  origin: 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());
@@ -26,6 +42,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Статический доступ к загруженным файлам
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+console.log('Настроен статический доступ к директории uploads:', path.join(__dirname, 'uploads'));
 
 // Добавляем логирование запросов
 app.use((req, res, next) => {
@@ -94,68 +111,74 @@ try {
 }
 
 // Настройка multer для загрузки файлов
-const uploadDir = path.join(__dirname, 'uploads');
-// Создаем директорию, если она не существует
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Настройка хранилища multer
 const storage = multer.diskStorage({
-  destination: function(req, file, cb) {
-    cb(null, uploadDir);
+  destination: function (req, file, cb) {
+    // Проверка существования директории
+    const uploadsDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      console.log('Создание директории uploads:', uploadsDir);
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    cb(null, uploadsDir);
   },
-  filename: function(req, file, cb) {
-    // Генерируем уникальное имя, сохраняя расширение файла
+  filename: function (req, file, cb) {
+    console.log('Загрузка файла:', file.originalname);
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     cb(null, 'avatar-' + uniqueSuffix + ext);
   }
 });
 
-// Функция фильтрации файлов по типу
+// Фильтр файлов (только изображения)
 const fileFilter = (req, file, cb) => {
-  // Принимаем только изображения
+  console.log('Проверка типа файла:', file.mimetype);
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
-    cb(new Error('Разрешены только изображения (JPEG, PNG, GIF)'), false);
+    cb(new Error('Разрешены только изображения!'), false);
   }
 };
 
-// Создаем экземпляр multer
 const upload = multer({ 
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 МБ
+    fileSize: 5 * 1024 * 1024 // 5 МБ
   }
 });
 
 // Middleware для проверки JWT токена
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+const verifyToken = (req, res, next) => {
+  console.log('Проверка JWT токена');
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      message: 'Не авторизован, токен отсутствует'
-    });
+  // Получаем токен из заголовка
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    console.log('Токен отсутствует');
+    return res.status(401).json({ success: false, message: 'Не авторизован, токен отсутствует' });
   }
   
+  // Проверяем формат токена
   const token = authHeader.split(' ')[1];
+  if (!token) {
+    console.log('Неверный формат токена');
+    return res.status(401).json({ success: false, message: 'Неверный формат токена' });
+  }
   
+  // Верифицируем токен
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
     req.userId = decoded.id;
+    console.log('Токен прошел проверку, id пользователя:', req.userId);
     next();
   } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: 'Неверный или просроченный токен'
-    });
+    console.log('Ошибка верификации токена:', error.message);
+    return res.status(401).json({ success: false, message: 'Недействительный токен' });
   }
 };
+
+// Используем переименованную функцию везде последовательно
+const authMiddleware = verifyToken;
 
 // Маршруты API
 // Если модули ES, пытаемся их импортировать с помощью ESM Loader
@@ -410,8 +433,10 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 
 // Обновление профиля пользователя (без аватара)
 app.put('/api/users/profile', authMiddleware, async (req, res) => {
+  console.log('Получен запрос на обновление профиля без аватара');
   try {
     const { name } = req.body;
+    console.log('Данные для обновления:', { name });
     
     // Проверяем, что есть данные для обновления
     if (!name) {
@@ -435,12 +460,14 @@ app.put('/api/users/profile', authMiddleware, async (req, res) => {
       });
     }
     
+    console.log('Профиль успешно обновлен для пользователя:', user.email);
     res.json({
       success: true,
       data: user,
       message: 'Профиль успешно обновлен'
     });
   } catch (error) {
+    console.error('Ошибка при обновлении профиля:', error);
     res.status(500).json({
       success: false,
       message: 'Ошибка сервера при обновлении профиля'
@@ -450,55 +477,60 @@ app.put('/api/users/profile', authMiddleware, async (req, res) => {
 
 // Обновление аватара пользователя
 app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
+  console.log('Получен запрос на обновление аватара');
+  
   try {
-    // Проверяем, был ли загружен файл
+    // Проверяем загрузку файла
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Файл аватара не был загружен'
-      });
+      console.log('Файл не загружен');
+      return res.status(400).json({ success: false, message: 'Файл не загружен' });
     }
     
-    // Формируем URL для аватара
-    const avatarUrl = `/uploads/${req.file.filename}`;
+    console.log('Файл загружен:', req.file);
     
-    // Обновляем другие данные профиля, если они есть
-    const updateData = { avatar: avatarUrl };
-    if (req.body.name) {
-      updateData.name = req.body.name;
-    }
-    
-    // Находим и обновляем пользователя
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+    // Получаем пользователя из базы данных
+    const user = await User.findById(req.userId);
     
     if (!user) {
       // Если пользователь не найден, удаляем загруженный файл
-      fs.unlinkSync(req.file.path);
-      return res.status(404).json({
-        success: false,
-        message: 'Пользователь не найден'
-      });
+      if (req.file && req.file.path) {
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error('Ошибка при удалении файла:', err);
+        });
+      }
+      
+      return res.status(404).json({ success: false, message: 'Пользователь не найден' });
     }
     
-    res.json({
+    // Формируем URL для аватара (относительный путь)
+    const avatarUrl = `/uploads/${path.basename(req.file.path)}`;
+    console.log('URL аватара:', avatarUrl);
+    
+    // Обновляем аватар пользователя
+    user.avatar = avatarUrl;
+    await user.save();
+    console.log('Аватар успешно обновлен для пользователя:', user.email);
+    
+    // Возвращаем обновленные данные пользователя
+    return res.json({
       success: true,
-      data: user,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        joinDate: user.joinDate,
+        tokens: user.tokens,
+        friends: user.friends,
+        followers: user.followers,
+        stats: user.stats
+      },
       message: 'Аватар успешно обновлен'
     });
   } catch (error) {
-    // В случае ошибки, удаляем загруженный файл, если он есть
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка сервера при обновлении аватара'
-    });
+    console.error('Ошибка при обновлении аватара:', error);
+    return res.status(500).json({ success: false, message: 'Ошибка при обновлении аватара' });
   }
 });
 
