@@ -1,0 +1,53 @@
+{
+  "user@example.com": {
+    "id": "1",
+    "name": "Иван Петров",
+    "email": "user@example.com",
+    "password": "password",
+    "role": "participant",
+    "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80",
+    "joinDate": "2025-03-22T12:03:38.505Z",
+    "tokens": 100,
+    "friends": 5,
+    "followers": 10,
+    "stats": {
+      "events": 2,
+      "reviews": 3,
+      "posts": 5
+    }
+  },
+  "vip@example.com": {
+    "id": "2",
+    "name": "Мария Иванова",
+    "email": "vip@example.com",
+    "password": "password",
+    "role": "vip",
+    "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80",
+    "joinDate": "2025-03-22T12:03:38.505Z",
+    "tokens": 500,
+    "friends": 25,
+    "followers": 50,
+    "stats": {
+      "events": 10,
+      "reviews": 15,
+      "posts": 20
+    }
+  },
+  "adambereg@gmail.com": {
+    "id": "3",
+    "name": "Адам Берег",
+    "email": "adambereg@gmail.com",
+    "password": "123z456a",
+    "role": "participant",
+    "avatar": "",
+    "joinDate": "2025-03-22T12:03:38.505Z",
+    "tokens": 50,
+    "friends": 0,
+    "followers": 0,
+    "stats": {
+      "events": 0,
+      "reviews": 0,
+      "posts": 0
+    }
+  }
+}

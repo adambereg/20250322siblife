@@ -9,12 +9,30 @@ dotenv.config();
 
 // Инициализируем Express
 const app = express();
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Добавляем логирование запросов
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log('Заголовки:', req.headers);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('Тело запроса:', req.body);
+  }
+  
+  // Логирование ответа
+  const originalJson = res.json;
+  res.json = function(body) {
+    console.log(`[${new Date().toISOString()}] Ответ:`, body);
+    return originalJson.call(this, body);
+  };
+  
+  next();
+});
 
 // Функция для подключения к MongoDB
 const connectDB = async () => {
@@ -53,13 +71,13 @@ connectDB().catch(err => {
   console.log('Продолжаем работу с моковыми данными');
 });
 
-// Вспомогательные функции для генерации моковых данных
+// Вместо чтения из файла используем пользователей в памяти
 const mockUsers = {
   'user@example.com': {
     id: '1',
     name: 'Иван Петров',
     email: 'user@example.com',
-    password: 'password', // В реальном приложении хранились бы хешированные пароли
+    password: 'password',
     role: 'participant',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
     joinDate: new Date().toISOString(),
@@ -88,8 +106,31 @@ const mockUsers = {
       reviews: 15,
       posts: 20
     }
+  },
+  'adambereg@gmail.com': {
+    id: '3',
+    name: 'Адам Берег',
+    email: 'adambereg@gmail.com',
+    password: '123z456a',
+    role: 'participant',
+    avatar: '',
+    joinDate: new Date().toISOString(),
+    tokens: 50,
+    friends: 0,
+    followers: 0,
+    stats: {
+      events: 0,
+      reviews: 0,
+      posts: 0
+    }
   }
 };
+
+// Выводим в консоль информацию о доступных пользователях
+console.log('Доступные пользователи:');
+for (const email in mockUsers) {
+  console.log(`- ${email} (${mockUsers[email].name}): пароль = ${mockUsers[email].password}`);
+}
 
 // API маршруты (заглушки)
 app.get('/api/auth/me', (req, res) => {
@@ -104,18 +145,29 @@ app.get('/api/auth/me', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   
-  // Проверяем наличие пользователя в моковых данных
+  // Проверяем наличие пользователя в моковых данных и правильность пароля
   const user = mockUsers[email];
-  if (user && password === 'password') {
+  console.log(`Попытка входа для ${email}, найден пользователь:`, user ? 'Да' : 'Нет');
+  if (user) {
+    console.log(`Сравнение паролей: '${password}' и '${user.password}' - ${password === user.password ? 'Совпадают' : 'Не совпадают'}`);
+  }
+  
+  if (user && user.password === password) {
     // Создаем копию пользователя без пароля и добавляем токен
     const { password, ...userData } = user;
     userData.token = 'fake-jwt-token-example-' + userData.id;
+    
+    console.log(`Успешный вход пользователя ${email}`);
     
     res.json({
       success: true,
       data: userData
     });
   } else {
+    console.log(`Ошибка входа: пользователь ${email} не найден или неверный пароль`);
+    if (user) {
+      console.log(`Сохраненный пароль: ${user.password}, переданный пароль: ${password}`);
+    }
     res.status(401).json({
       success: false,
       message: 'Неверный email или пароль'
@@ -155,6 +207,8 @@ app.post('/api/auth/register', (req, res) => {
   
   // "Сохраняем" пользователя в моковых данных
   mockUsers[email] = newUser;
+  
+  console.log(`Зарегистрирован новый пользователь: ${email}, роль: ${role || 'participant'}`);
   
   // Отправляем ответ без пароля и с токеном
   const { password: _, ...userData } = newUser;

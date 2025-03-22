@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { RegisterData, UserRole } from '../types/auth';
 
 const RegisterForm: React.FC = () => {
   const { authState, register, clearError } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<RegisterData>({
     name: '',
     email: '',
@@ -14,6 +15,15 @@ const RegisterForm: React.FC = () => {
   });
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Перенаправление при успешной регистрации
+  useEffect(() => {
+    if (authState.isAuthenticated && authState.user) {
+      navigate('/roles');
+    }
+  }, [authState.isAuthenticated, authState.user, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -35,6 +45,7 @@ const RegisterForm: React.FC = () => {
     }
     
     if (authState.error) clearError();
+    if (errorMessage) setErrorMessage(null);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -45,17 +56,33 @@ const RegisterForm: React.FC = () => {
       return;
     }
     
-    await register(formData);
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    
+    try {
+      console.log('Отправка данных регистрации:', formData);
+      await register(formData);
+      console.log('Результат регистрации:', authState);
+      
+      if (authState.error) {
+        setErrorMessage(authState.error);
+      }
+    } catch (error) {
+      console.error('Ошибка регистрации:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Неизвестная ошибка при регистрации');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
       <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">Регистрация</h2>
       
-      {authState.error && (
+      {(authState.error || errorMessage) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start">
           <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-          <span>{authState.error}</span>
+          <span>{authState.error || errorMessage}</span>
         </div>
       )}
 
@@ -190,9 +217,9 @@ const RegisterForm: React.FC = () => {
         <button
           type="submit"
           className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center"
-          disabled={authState.loading || !!passwordError}
+          disabled={isSubmitting || !!passwordError}
         >
-          {authState.loading ? (
+          {isSubmitting ? (
             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

@@ -1,12 +1,18 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { LoginCredentials, RegisterData, User } from '../types/auth';
+
+// Определяем базовый URL для API
+// Используем localhost:3000 для API и localhost:5173 для клиента
+const API_BASE_URL = 'http://localhost:3000/api';
 
 // Создаем инстанс axios с базовым URL
 const API = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  // Время ожидания ответа от сервера - 10 секунд
+  timeout: 10000,
 });
 
 // Добавляем интерцептор для добавления токена к запросам
@@ -15,8 +21,27 @@ API.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  console.log(`🚀 Запрос: ${config.method?.toUpperCase()} ${config.url}`, config.data || '');
   return config;
 });
+
+// Интерцептор ответов для логирования
+API.interceptors.response.use(
+  (response: AxiosResponse) => {
+    console.log(`✅ Ответ: ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data);
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.response) {
+      console.error(`❌ Ошибка: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.response.data);
+    } else if (error.request) {
+      console.error(`❌ Нет ответа от сервера: ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.message);
+    } else {
+      console.error(`❌ Ошибка запроса: ${error.message}`);
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Интерфейсы для ответов API
 interface ApiResponse<T> {
@@ -40,6 +65,7 @@ export const authAPI = {
       }
       return data;
     } catch (error: any) {
+      console.error('Ошибка при логине:', error);
       if (error.response) {
         return { success: false, message: error.response.data.message || 'Ошибка авторизации' };
       }
@@ -50,7 +76,11 @@ export const authAPI = {
   // Регистрация нового пользователя
   register: async (userData: RegisterData): Promise<ApiResponse<User>> => {
     try {
-      const { data } = await API.post<ApiResponse<User>>('/auth/register', userData);
+      console.log('Отправка запроса регистрации:', userData);
+      const response = await API.post<ApiResponse<User>>('/auth/register', userData);
+      console.log('Ответ на запрос регистрации:', response);
+      
+      const { data } = response;
       if (data.success && data.data) {
         // Решение TypeScript проблемы
         const user = data.data as User & { token?: string };
@@ -60,6 +90,7 @@ export const authAPI = {
       }
       return data;
     } catch (error: any) {
+      console.error('Ошибка при регистрации:', error);
       if (error.response) {
         return { success: false, message: error.response.data.message || 'Ошибка регистрации' };
       }
@@ -78,6 +109,7 @@ export const authAPI = {
       const { data } = await API.get<ApiResponse<User>>('/auth/me');
       return data;
     } catch (error: any) {
+      console.error('Ошибка при получении данных пользователя:', error);
       if (error.response) {
         return { success: false, message: error.response.data.message || 'Ошибка получения данных пользователя' };
       }
