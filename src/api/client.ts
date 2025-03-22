@@ -1,9 +1,8 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { LoginCredentials, RegisterData, User } from '../types/auth';
 
-// Определяем базовый URL для API
-// Используем localhost:5173 для API (так как сервер на том же порту)
-const API_BASE_URL = 'http://localhost:5173/api';
+// Базовый URL для API — используем относительный путь для проксирования через Vite
+const API_BASE_URL = '/api';
 
 // Создаем инстанс axios с базовым URL
 const API = axios.create({

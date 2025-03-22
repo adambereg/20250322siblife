@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { UserRole } from '../types/auth';
+import { UserRole } from '../types/auth.js';
 
 // Интерфейс для документа пользователя в MongoDB
 export interface IUser extends Document {
