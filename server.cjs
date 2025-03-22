@@ -51,6 +51,9 @@ app.use((req, res, next) => {
     console.log('Тело запроса:', req.body);
   }
   
+  // Логирование заголовков запроса
+  console.log('Заголовки запроса:', req.headers);
+  
   // Логирование ответа
   const originalJson = res.json;
   res.json = function(body) {
@@ -479,20 +482,25 @@ app.put('/api/users/profile', authMiddleware, async (req, res) => {
 app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
   console.log('Получен запрос на обновление аватара');
   
+  // Логируем заголовки запроса
+  console.log('Заголовки запроса:', req.headers);
+  
   try {
     // Проверяем загрузку файла
     if (!req.file) {
-      console.log('Файл не загружен');
+      console.log('Файл не загружен в запросе');
       return res.status(400).json({ success: false, message: 'Файл не загружен' });
     }
     
-    console.log('Файл загружен:', req.file);
+    console.log('Файл успешно загружен:', req.file);
+    console.log('Путь к файлу:', req.file.path);
     
     // Получаем пользователя из базы данных
     const user = await User.findById(req.userId);
     
     if (!user) {
       // Если пользователь не найден, удаляем загруженный файл
+      console.log('Пользователь не найден, удаляем загруженный файл');
       if (req.file && req.file.path) {
         fs.unlink(req.file.path, (err) => {
           if (err) console.error('Ошибка при удалении файла:', err);
@@ -505,6 +513,16 @@ app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), as
     // Формируем URL для аватара (относительный путь)
     const avatarUrl = `/uploads/${path.basename(req.file.path)}`;
     console.log('URL аватара:', avatarUrl);
+    
+    // Проверяем существование старого аватара и удаляем его, если он есть
+    if (user.avatar && user.avatar !== '' && !user.avatar.startsWith('http')) {
+      const oldAvatarPath = path.join(__dirname, user.avatar);
+      console.log('Проверка существования старого аватара:', oldAvatarPath);
+      if (fs.existsSync(oldAvatarPath)) {
+        console.log('Удаление старого аватара:', oldAvatarPath);
+        fs.unlinkSync(oldAvatarPath);
+      }
+    }
     
     // Обновляем аватар пользователя
     user.avatar = avatarUrl;
@@ -530,7 +548,7 @@ app.put('/api/users/profile/avatar', authMiddleware, upload.single('avatar'), as
     });
   } catch (error) {
     console.error('Ошибка при обновлении аватара:', error);
-    return res.status(500).json({ success: false, message: 'Ошибка при обновлении аватара' });
+    return res.status(500).json({ success: false, message: 'Ошибка при обновлении аватара: ' + error.message });
   }
 });
 

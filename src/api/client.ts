@@ -1,8 +1,8 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { LoginCredentials, RegisterData, User } from '../types/auth';
 
-// Базовый URL для API — используем относительный путь для проксирования через Vite
-const API_BASE_URL = '/api';
+// Базовый URL для API — используем полный путь для прямого доступа к серверу на порту 5000
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // Создаем инстанс axios с базовым URL
 const API = axios.create({
@@ -12,6 +12,8 @@ const API = axios.create({
   },
   // Время ожидания ответа от сервера - 10 секунд
   timeout: 10000,
+  // Разрешаем отправку куки с кросс-доменными запросами
+  withCredentials: true,
 });
 
 // Добавляем интерцептор для добавления токена к запросам

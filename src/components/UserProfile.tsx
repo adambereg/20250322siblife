@@ -1,7 +1,6 @@
 import React from 'react';
-import { User } from '../types/auth';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, User as UserIcon, Settings, Bell, Calendar, MapPin, ShoppingBag, Users } from 'lucide-react';
+import { LogOut, Settings, Bell, Calendar, MapPin, ShoppingBag, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface UserProfileProps {
