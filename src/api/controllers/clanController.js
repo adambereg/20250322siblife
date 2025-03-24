@@ -1,240 +1,17 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const router = express.Router();
-const path = require('path');
-const fs = require('fs');
+import Clan from '../../models/Clan.js';
+import User from '../../models/User.js';
+import mongoose from 'mongoose';
+import { uploadFile } from '../../utils/fileUpload.js';
 
-// Middleware для проверки авторизации
-const auth = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
-  
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Требуется авторизация'
-    });
-  }
-  
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    req.user = decoded;
-    next();
-  } catch (error) {
-    console.error('Ошибка при проверке токена:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Неверный токен авторизации'
-    });
-  }
-};
-
-// Функция загрузки файлов
-const uploadFile = async (file, folder) => {
-  const uploadsDir = path.join(__dirname, '../../uploads', folder);
-  
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  
-  const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
-  const filePath = path.join(uploadsDir, fileName);
-  
-  // Переместить файл
-  await file.mv(filePath);
-  
-  return `/uploads/${folder}/${fileName}`;
-};
-
-// Модель клана
-const ClanSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Название клана обязательно'],
-    trim: true,
-    maxlength: [100, 'Название клана не должно превышать 100 символов']
-  },
-  description: {
-    type: String,
-    required: [true, 'Описание клана обязательно'],
-    trim: true,
-    maxlength: [1000, 'Описание клана не должно превышать 1000 символов']
-  },
-  type: {
-    type: String,
-    enum: ['open', 'closed'],
-    default: 'open',
-    required: true
-  },
-  logo: {
-    type: String,
-    default: null
-  },
-  leader: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  members: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    role: {
-      type: String,
-      enum: ['leader', 'member'],
-      default: 'member'
-    },
-    joinedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  rating: {
-    type: Number,
-    default: 0
-  },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'archived'],
-    default: 'active'
-  },
-  tags: [{
-    type: String,
-    trim: true
-  }],
-  activity: [{
-    type: {
-      type: String,
-      enum: ['post', 'event', 'member_joined', 'route_created'],
-      required: true
-    },
-    title: {
-      type: String,
-      required: true
-    },
-    content: {
-      type: String
-    },
-    author: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    },
-    comments: [{
-      author: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      content: {
-        type: String,
-        required: true
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now
-      }
-    }]
-  }],
-  membershipRequests: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'pending'
-    },
-    requestedAt: {
-      type: Date,
-      default: Date.now
-    },
-    message: {
-      type: String
-    }
-  }],
-  events: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Event'
-  }],
-  routes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Route'
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Индексы для повышения производительности
-ClanSchema.index({ name: 1 });
-ClanSchema.index({ leader: 1 });
-ClanSchema.index({ 'members.user': 1 });
-ClanSchema.index({ status: 1 });
-ClanSchema.index({ rating: -1 });
-ClanSchema.index({ tags: 1 });
-
-// Методы модели
-ClanSchema.methods.isMember = function(userId) {
-  return this.members.some(member => member.user.toString() === userId.toString());
-};
-
-ClanSchema.methods.isLeader = function(userId) {
-  return this.leader.toString() === userId.toString();
-};
-
-ClanSchema.methods.addMember = function(userId) {
-  if (this.isMember(userId)) {
-    return false;
-  }
-  
-  this.members.push({
-    user: userId,
-    role: 'member',
-    joinedAt: new Date()
-  });
-  
-  return true;
-};
-
-ClanSchema.methods.addActivity = function(activityData) {
-  this.activity.unshift(activityData);
-  
-  if (this.activity.length > 100) {
-    this.activity = this.activity.slice(0, 100);
-  }
-  
-  return true;
-};
-
-// Pre-хук для обновления даты изменения
-ClanSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  next();
-});
-
-// Создаем модель
-const Clan = mongoose.model('Clan', ClanSchema);
-
-// API маршруты
-
-// Создание клана
-router.post('/', auth, async (req, res) => {
+// @desc    Создать новый клан
+// @route   POST /api/clans
+// @access  Private (только PRO-пользователи)
+export const createClan = async (req, res) => {
   try {
     const { name, description, type, tags } = req.body;
     
-    // Проверка на роль PRO-участника
-    const User = mongoose.model('User');
+    // Проверяем, является ли пользователь PRO-участником
     const user = await User.findById(req.user.id);
-    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -249,13 +26,13 @@ router.post('/', auth, async (req, res) => {
       });
     }
     
-    // Загрузка логотипа
+    // Проверяем, есть ли файл логотипа
     let logoPath = null;
     if (req.files && req.files.logo) {
       logoPath = await uploadFile(req.files.logo, 'clan-logos');
     }
     
-    // Создаем клан
+    // Создаем новый клан
     const clan = new Clan({
       name,
       description,
@@ -265,14 +42,14 @@ router.post('/', auth, async (req, res) => {
       tags: tags ? tags.split(',').map(tag => tag.trim()) : []
     });
     
-    // Добавляем лидера как участника
+    // Добавляем лидера как первого участника
     clan.members.push({
       user: req.user.id,
       role: 'leader',
       joinedAt: new Date()
     });
     
-    // Добавляем активность
+    // Добавляем запись в активность
     clan.addActivity({
       type: 'post',
       title: 'Клан создан',
@@ -281,8 +58,10 @@ router.post('/', auth, async (req, res) => {
       createdAt: new Date()
     });
     
+    // Сохраняем клан
     await clan.save();
     
+    // Возвращаем ответ с созданным кланом
     res.status(201).json({
       success: true,
       message: 'Клан успешно создан',
@@ -296,10 +75,12 @@ router.post('/', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Получение списка кланов
-router.get('/', async (req, res) => {
+// @desc    Получить все кланы с фильтрацией и пагинацией
+// @route   GET /api/clans
+// @access  Public
+export const getClans = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
@@ -308,14 +89,17 @@ router.get('/', async (req, res) => {
     // Фильтры
     const filter = { status: 'active' };
     
+    // Поиск по имени
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: 'i' };
     }
     
+    // Фильтр по типу
     if (req.query.type) {
       filter.type = req.query.type;
     }
     
+    // Фильтр по тегам
     if (req.query.tags) {
       const tags = req.query.tags.split(',').map(tag => tag.trim());
       filter.tags = { $in: tags };
@@ -333,6 +117,7 @@ router.get('/', async (req, res) => {
         }
       });
     } else {
+      // По умолчанию сортируем по рейтингу (по убыванию)
       sort.rating = -1;
     }
     
@@ -344,9 +129,10 @@ router.get('/', async (req, res) => {
       .populate('leader', 'name avatar role')
       .populate('members.user', 'name avatar role');
     
-    // Общее количество для пагинации
+    // Получаем общее количество кланов для пагинации
     const total = await Clan.countDocuments(filter);
     
+    // Возвращаем ответ
     res.status(200).json({
       success: true,
       data: {
@@ -367,10 +153,12 @@ router.get('/', async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Получение клана по ID
-router.get('/:id', async (req, res) => {
+// @desc    Получить клан по ID
+// @route   GET /api/clans/:id
+// @access  Public
+export const getClanById = async (req, res) => {
   try {
     const clan = await Clan.findById(req.params.id)
       .populate('leader', 'name avatar role')
@@ -390,6 +178,7 @@ router.get('/:id', async (req, res) => {
       });
     }
     
+    // Возвращаем ответ
     res.status(200).json({
       success: true,
       data: clan
@@ -402,10 +191,12 @@ router.get('/:id', async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Обновление клана
-router.put('/:id', auth, async (req, res) => {
+// @desc    Обновить клан
+// @route   PUT /api/clans/:id
+// @access  Private (только лидер клана)
+export const updateClan = async (req, res) => {
   try {
     let clan = await Clan.findById(req.params.id);
     
@@ -416,7 +207,7 @@ router.put('/:id', auth, async (req, res) => {
       });
     }
     
-    // Проверка прав доступа
+    // Проверяем права доступа (только лидер может редактировать)
     if (!clan.isLeader(req.user.id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -424,7 +215,7 @@ router.put('/:id', auth, async (req, res) => {
       });
     }
     
-    // Обновляем поля
+    // Обновляем поля клана
     const { name, description, type, tags } = req.body;
     
     if (name) clan.name = name;
@@ -432,12 +223,12 @@ router.put('/:id', auth, async (req, res) => {
     if (type) clan.type = type;
     if (tags) clan.tags = tags.split(',').map(tag => tag.trim());
     
-    // Загрузка нового логотипа
+    // Обрабатываем загрузку нового логотипа
     if (req.files && req.files.logo) {
       clan.logo = await uploadFile(req.files.logo, 'clan-logos');
     }
     
-    // Добавляем активность
+    // Добавляем запись в активность
     clan.addActivity({
       type: 'post',
       title: 'Клан обновлен',
@@ -446,8 +237,10 @@ router.put('/:id', auth, async (req, res) => {
       createdAt: new Date()
     });
     
+    // Сохраняем обновленный клан
     await clan.save();
     
+    // Возвращаем ответ
     res.status(200).json({
       success: true,
       message: 'Клан успешно обновлен',
@@ -461,10 +254,12 @@ router.put('/:id', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Удаление клана (архивация)
-router.delete('/:id', auth, async (req, res) => {
+// @desc    Удалить клан
+// @route   DELETE /api/clans/:id
+// @access  Private (только лидер клана или админ)
+export const deleteClan = async (req, res) => {
   try {
     const clan = await Clan.findById(req.params.id);
     
@@ -475,7 +270,7 @@ router.delete('/:id', auth, async (req, res) => {
       });
     }
     
-    // Проверка прав доступа
+    // Проверяем права доступа
     if (!clan.isLeader(req.user.id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -483,10 +278,11 @@ router.delete('/:id', auth, async (req, res) => {
       });
     }
     
-    // Архивируем клан вместо удаления
+    // Вместо полного удаления, меняем статус на 'archived'
     clan.status = 'archived';
     await clan.save();
     
+    // Возвращаем ответ
     res.status(200).json({
       success: true,
       message: 'Клан успешно архивирован'
@@ -499,10 +295,12 @@ router.delete('/:id', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Вступление в клан
-router.post('/:id/join', auth, async (req, res) => {
+// @desc    Вступить в клан
+// @route   POST /api/clans/:id/join
+// @access  Private
+export const joinClan = async (req, res) => {
   try {
     const clan = await Clan.findById(req.params.id);
     
@@ -513,7 +311,7 @@ router.post('/:id/join', auth, async (req, res) => {
       });
     }
     
-    // Проверяем, не является ли пользователь уже членом
+    // Проверяем, не является ли пользователь уже членом клана
     if (clan.isMember(req.user.id)) {
       return res.status(400).json({
         success: false,
@@ -523,7 +321,7 @@ router.post('/:id/join', auth, async (req, res) => {
     
     // Проверяем тип клана
     if (clan.type === 'closed') {
-      // Проверяем наличие заявки
+      // Проверяем, нет ли уже заявки на вступление
       const existingRequest = clan.membershipRequests.find(
         request => request.user.toString() === req.user.id && request.status === 'pending'
       );
@@ -531,11 +329,11 @@ router.post('/:id/join', auth, async (req, res) => {
       if (existingRequest) {
         return res.status(400).json({
           success: false,
-          message: 'Вы уже отправили заявку на вступление'
+          message: 'Вы уже отправили заявку на вступление в этот клан'
         });
       }
       
-      // Добавляем заявку
+      // Добавляем заявку на вступление
       clan.membershipRequests.push({
         user: req.user.id,
         status: 'pending',
@@ -547,10 +345,10 @@ router.post('/:id/join', auth, async (req, res) => {
       
       return res.status(200).json({
         success: true,
-        message: 'Заявка на вступление отправлена'
+        message: 'Заявка на вступление в клан отправлена'
       });
     } else {
-      // Открытый клан - сразу добавляем
+      // Открытый клан - сразу добавляем пользователя
       clan.addMember(req.user.id);
       
       // Добавляем активность
@@ -577,10 +375,12 @@ router.post('/:id/join', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Обработка заявок на вступление
-router.put('/:id/requests/:requestId', auth, async (req, res) => {
+// @desc    Обработать заявку на вступление в клан
+// @route   PUT /api/clans/:id/requests/:requestId
+// @access  Private (только лидер клана)
+export const processMembershipRequest = async (req, res) => {
   try {
     const { id, requestId } = req.params;
     const { status } = req.body;
@@ -601,11 +401,11 @@ router.put('/:id/requests/:requestId', auth, async (req, res) => {
       });
     }
     
-    // Проверка прав доступа
+    // Проверяем права доступа
     if (!clan.isLeader(req.user.id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'У вас нет прав для обработки заявок'
+        message: 'У вас нет прав для обработки заявок в этот клан'
       });
     }
     
@@ -625,8 +425,10 @@ router.put('/:id/requests/:requestId', auth, async (req, res) => {
     
     // Обрабатываем заявку
     if (status === 'approved') {
+      // Добавляем пользователя в члены клана
       clan.addMember(request.user);
       
+      // Добавляем активность
       clan.addActivity({
         type: 'member_joined',
         title: 'Новый участник',
@@ -636,6 +438,7 @@ router.put('/:id/requests/:requestId', auth, async (req, res) => {
       });
     }
     
+    // Обновляем статус заявки
     clan.membershipRequests[requestIndex].status = status;
     
     await clan.save();
@@ -652,10 +455,12 @@ router.put('/:id/requests/:requestId', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Выход из клана
-router.delete('/:id/leave', auth, async (req, res) => {
+// @desc    Выйти из клана
+// @route   DELETE /api/clans/:id/leave
+// @access  Private
+export const leaveClan = async (req, res) => {
   try {
     const clan = await Clan.findById(req.params.id);
     
@@ -666,7 +471,7 @@ router.delete('/:id/leave', auth, async (req, res) => {
       });
     }
     
-    // Проверяем членство
+    // Проверяем, является ли пользователь членом клана
     if (!clan.isMember(req.user.id)) {
       return res.status(400).json({
         success: false,
@@ -674,15 +479,15 @@ router.delete('/:id/leave', auth, async (req, res) => {
       });
     }
     
-    // Проверяем, не лидер ли это
+    // Проверяем, не является ли пользователь лидером клана
     if (clan.isLeader(req.user.id)) {
       return res.status(400).json({
         success: false,
-        message: 'Лидер не может выйти из клана. Сначала передайте лидерство'
+        message: 'Лидер не может выйти из клана. Сначала передайте лидерство другому участнику'
       });
     }
     
-    // Удаляем из членов
+    // Удаляем пользователя из списка участников
     clan.members = clan.members.filter(
       member => member.user.toString() !== req.user.id
     );
@@ -701,10 +506,12 @@ router.delete('/:id/leave', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Добавление поста в ленту клана
-router.post('/:id/posts', auth, async (req, res) => {
+// @desc    Добавить пост в ленту активности клана
+// @route   POST /api/clans/:id/posts
+// @access  Private (только участники клана)
+export const addClanPost = async (req, res) => {
   try {
     const { title, content } = req.body;
     
@@ -724,7 +531,7 @@ router.post('/:id/posts', auth, async (req, res) => {
       });
     }
     
-    // Проверяем членство
+    // Проверяем, является ли пользователь членом клана
     if (!clan.isMember(req.user.id)) {
       return res.status(403).json({
         success: false,
@@ -732,7 +539,7 @@ router.post('/:id/posts', auth, async (req, res) => {
       });
     }
     
-    // Добавляем пост
+    // Добавляем пост в активность
     clan.addActivity({
       type: 'post',
       title,
@@ -755,10 +562,12 @@ router.post('/:id/posts', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Добавление комментария к активности
-router.post('/:id/activities/:activityId/comments', auth, async (req, res) => {
+// @desc    Добавить комментарий к активности клана
+// @route   POST /api/clans/:id/activities/:activityId/comments
+// @access  Private (только участники клана)
+export const addCommentToActivity = async (req, res) => {
   try {
     const { content } = req.body;
     const { id, activityId } = req.params;
@@ -779,11 +588,11 @@ router.post('/:id/activities/:activityId/comments', auth, async (req, res) => {
       });
     }
     
-    // Проверяем членство
+    // Проверяем, является ли пользователь членом клана
     if (!clan.isMember(req.user.id)) {
       return res.status(403).json({
         success: false,
-        message: 'Только участники клана могут комментировать'
+        message: 'Только участники клана могут добавлять комментарии'
       });
     }
     
@@ -820,10 +629,12 @@ router.post('/:id/activities/:activityId/comments', auth, async (req, res) => {
       error: error.message
     });
   }
-});
+};
 
-// Передача лидерства
-router.put('/:id/transfer-leadership', auth, async (req, res) => {
+// @desc    Передать лидерство в клане
+// @route   PUT /api/clans/:id/transfer-leadership
+// @access  Private (только лидер клана)
+export const transferLeadership = async (req, res) => {
   try {
     const { newLeaderId } = req.body;
     
@@ -843,7 +654,7 @@ router.put('/:id/transfer-leadership', auth, async (req, res) => {
       });
     }
     
-    // Проверка прав доступа
+    // Проверяем права доступа
     if (!clan.isLeader(req.user.id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -851,7 +662,7 @@ router.put('/:id/transfer-leadership', auth, async (req, res) => {
       });
     }
     
-    // Проверяем нового лидера
+    // Проверяем, существует ли участник с таким ID
     const newLeaderMember = clan.members.find(
       member => member.user.toString() === newLeaderId
     );
@@ -866,7 +677,7 @@ router.put('/:id/transfer-leadership', auth, async (req, res) => {
     // Передаем лидерство
     clan.leader = newLeaderId;
     
-    // Обновляем роли
+    // Обновляем роли участников
     clan.members.forEach(member => {
       if (member.user.toString() === newLeaderId) {
         member.role = 'leader';
@@ -875,7 +686,7 @@ router.put('/:id/transfer-leadership', auth, async (req, res) => {
       }
     });
     
-    // Активность
+    // Добавляем активность
     clan.addActivity({
       type: 'post',
       title: 'Смена лидера',
@@ -898,6 +709,4 @@ router.put('/:id/transfer-leadership', auth, async (req, res) => {
       error: error.message
     });
   }
-});
-
-module.exports = router; 
+}; 

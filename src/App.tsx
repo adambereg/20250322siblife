@@ -1,6 +1,6 @@
 import React from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 
 // Компоненты
@@ -26,9 +26,12 @@ import AccessDeniedPage from './pages/AccessDeniedPage';
 import VIPProfilePage from './pages/VIPProfilePage';
 import PROProfilePage from './pages/PROProfilePage';
 import BusinessProfilePage from './pages/BusinessProfilePage';
+import BusinessProfileEditPage from './pages/BusinessProfileEditPage';
 import AdminProfilePage from './pages/AdminProfilePage';
 import ClansPage from './pages/ClansPage';
-import ClanDetailsPage from './pages/ClanDetailsPage';
+import ClanPage from './pages/ClanPage';
+import CreateClanPage from './pages/CreateClanPage';
+import EditClanPage from './pages/EditClanPage';
 import NewsPage from './pages/NewsPage';
 import NewsArticlePage from './pages/NewsArticlePage';
 import EventsPage from './pages/EventsPage';
@@ -40,6 +43,12 @@ import ProductDetailsPage from './pages/ProductDetailsPage';
 import HousingPage from './pages/HousingPage';
 import HousingDetailsPage from './pages/HousingDetailsPage';
 import ReferralsPage from './pages/ReferralsPage';
+import BusinessPartnerRegistration from './pages/BusinessPartnerRegistration';
+import VerificationPending from './pages/VerificationPending';
+import EmailVerification from './pages/EmailVerification';
+import ResetPassword from './pages/ResetPassword';
+import ForgotPassword from './pages/ForgotPassword';
+import BusinessDashboardPage from './pages/BusinessDashboardPage';
 
 // Иконки
 import { Users, Calendar, MapPin, ShoppingBag, Building2, Newspaper } from 'lucide-react';
@@ -79,6 +88,36 @@ const HomePage = () => (
   </main>
 );
 
+// Редирект на соответствующую страницу профиля в зависимости от роли пользователя
+const ProfileRedirect: React.FC = () => {
+  const { authState } = useAuth();
+  const navigate = useNavigate();
+  const { user } = authState;
+
+  React.useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case 'business':
+          navigate('/business-profile');
+          break;
+        case 'admin':
+          navigate('/admin-profile');
+          break;
+        case 'vip':
+          navigate('/vip-profile');
+          break;
+        case 'pro':
+          navigate('/pro-profile');
+          break;
+        default:
+          navigate('/profile');
+      }
+    }
+  }, [user, navigate]);
+
+  return null;
+};
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
@@ -88,23 +127,27 @@ const App: React.FC = () => {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/roles" element={<RolesPage />} />
         <Route path="/access-denied" element={<AccessDeniedPage />} />
+        <Route path="/business-register" element={<BusinessPartnerRegistration />} />
+        <Route path="/verification-pending" element={<VerificationPending />} />
+        <Route path="/verify-email/:token" element={<EmailVerification />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        
+        {/* Редирект на соответствующую страницу профиля */}
+        <Route 
+          path="/profile-redirect" 
+          element={
+            <PrivateRoute>
+              <Outlet />
+            </PrivateRoute>
+          } 
+        >
+          <Route index element={<ProfileRedirect />} />
+        </Route>
         
         {/* Маршруты с навбаром и футером */}
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route path="/events/:eventSlug" element={<EventDetailsPage />} />
-          <Route path="/places" element={<PlacesPage />} />
-          <Route path="/places/:placeId" element={<PlaceDetailsPage />} />
-          <Route path="/marketplace" element={<MarketplacePage />} />
-          <Route path="/marketplace/:productSlug" element={<ProductDetailsPage />} />
-          <Route path="/housing" element={<HousingPage />} />
-          <Route path="/housing/:housingSlug" element={<HousingDetailsPage />} />
-          <Route path="/news" element={<NewsPage />} />
-          <Route path="/news/:articleId" element={<NewsArticlePage />} />
-          <Route path="/clans" element={<ClansPage />} />
-          <Route path="/clans/:clanId" element={<ClanDetailsPage />} />
-          <Route path="/referrals" element={<ReferralsPage />} />
           
           {/* Защищенные маршруты */}
           <Route element={<PrivateRoute />}>
@@ -124,11 +167,45 @@ const App: React.FC = () => {
           
           <Route element={<PrivateRoute allowedRoles={['business', 'admin']} />}>
             <Route path="/business-profile" element={<BusinessProfilePage />} />
+            <Route path="/business-profile/edit" element={<BusinessProfileEditPage />} />
           </Route>
           
           <Route element={<PrivateRoute allowedRoles={['admin']} />}>
             <Route path="/admin-profile" element={<AdminProfilePage />} />
           </Route>
+
+          {/* Другие маршруты с навбаром */}
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/:eventSlug" element={<EventDetailsPage />} />
+          <Route path="/places" element={<PlacesPage />} />
+          <Route path="/places/:placeId" element={<PlaceDetailsPage />} />
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/marketplace/:productSlug" element={<ProductDetailsPage />} />
+          <Route path="/housing" element={<HousingPage />} />
+          <Route path="/housing/:housingSlug" element={<HousingDetailsPage />} />
+          <Route path="/news" element={<NewsPage />} />
+          <Route path="/news/:articleId" element={<NewsArticlePage />} />
+          <Route path="/clans" element={<ClansPage />} />
+          <Route path="/clans/create" element={
+            <PrivateRoute allowedRoles={['pro', 'admin']}>
+              <CreateClanPage />
+            </PrivateRoute>
+          } />
+          <Route path="/clans/:id/edit" element={
+            <PrivateRoute allowedRoles={['pro', 'admin']}>
+              <EditClanPage />
+            </PrivateRoute>
+          } />
+          <Route path="/clans/:id" element={<ClanPage />} />
+          <Route path="/referrals" element={<ReferralsPage />} />
+          <Route
+            path="/business-dashboard"
+            element={
+              <PrivateRoute allowedRoles={['business', 'admin']}>
+                <BusinessDashboardPage />
+              </PrivateRoute>
+            }
+          />
         </Route>
 
         {/* Редирект для неизвестных маршрутов */}

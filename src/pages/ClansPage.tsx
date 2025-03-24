@@ -1,350 +1,324 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Users, Search, Filter, Star, MapPin, Calendar, Crown,
   ChevronRight, Shield, Target, Trophy, UserPlus, Settings,
-  MessageCircle, Heart, Share2, Activity
+  MessageCircle, Heart, Share2, Activity, Plus, ArrowLeft, ArrowRight, Tag, X
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../api/client';
+import ClanCard from '../components/ClanCard';
+
+interface Clan {
+  _id: string;
+  name: string;
+  description: string;
+  logo: string | null;
+  type: 'open' | 'closed';
+  leader: {
+    _id: string;
+    name: string;
+    avatar: string;
+    role: string;
+  };
+  members: {
+    user: {
+      _id: string;
+      name: string;
+      avatar: string;
+      role: string;
+    };
+    role: string;
+    joinedAt: string;
+  }[];
+  rating: number;
+  tags: string[];
+  createdAt: string;
+}
 
 const ClansPage: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { authState } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState<boolean>(true);
+  const [clans, setClans] = useState<Clan[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [error, setError] = useState<string | null>(null);
 
-  const categories = [
-    { id: 'all', name: 'Все кланы' },
-    { id: 'hobby', name: 'Хобби и интересы' },
-    { id: 'events', name: 'Организация мероприятий' },
-    { id: 'pro', name: 'PRO и бизнес' },
-    { id: 'sports', name: 'Спорт и здоровье' },
-    { id: 'culture', name: 'Искусство и культура' },
-    { id: 'tech', name: 'Технологии' },
-    { id: 'city', name: 'Развитие города' }
-  ];
+  // Загрузка списка кланов
+  useEffect(() => {
+    const fetchClans = async () => {
+      try {
+        setLoading(true);
+        
+        // Формируем URL с параметрами фильтрации и пагинации
+        let url = `/api/clans?page=${page}&limit=6`;
+        
+        if (searchQuery) {
+          url += `&search=${encodeURIComponent(searchQuery)}`;
+        }
+        
+        if (selectedTypes.length > 0) {
+          url += `&types=${selectedTypes.join(',')}`;
+        }
+        
+        if (selectedTags.length > 0) {
+          url += `&tags=${selectedTags.join(',')}`;
+        }
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error('Не удалось загрузить кланы');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setClans(data.data.clans);
+          setTotalPages(data.data.pagination.pages);
+        } else {
+          setError(data.message || 'Произошла ошибка при загрузке кланов');
+        }
+      } catch (error) {
+        console.error('Ошибка при загрузке кланов:', error);
+        setError('Не удалось загрузить кланы. Пожалуйста, попробуйте позже.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchClans();
+  }, [page, searchQuery, selectedTypes, selectedTags]);
 
-  const clans = [
-    {
-      id: 1,
-      name: 'Активный Новосибирск',
-      category: 'sports',
-      members: 2450,
-      events: 12,
-      image: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
-      location: 'Центральный район',
-      description: 'Сообщество для любителей активного образа жизни и спорта',
-      leader: {
-        name: 'Михаил Сидоров',
-        avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-        role: 'PRO-Соучастник'
-      },
-      rating: 4.8,
-      reviews: 156,
-      socialRating: 850,
-      featured: true
-    },
-    {
-      id: 2,
-      name: 'Культурный код',
-      category: 'culture',
-      members: 1830,
-      events: 8,
-      image: 'https://images.unsplash.com/photo-1509824227185-9c5a01ceba0d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
-      location: 'Академгородок',
-      description: 'Объединение творческих людей и ценителей искусства',
-      leader: {
-        name: 'Анна Петрова',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-        role: 'VIP-Соучастник'
-      },
-      rating: 4.6,
-      reviews: 98,
-      socialRating: 720,
-      featured: true
-    },
-    {
-      id: 3,
-      name: 'IT-Community NSK',
-      category: 'tech',
-      members: 3200,
-      events: 15,
-      image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
-      location: 'Технопарк',
-      description: 'Сообщество IT-специалистов и энтузиастов технологий',
-      leader: {
-        name: 'Алексей Иванов',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-        role: 'PRO-Соучастник'
-      },
-      rating: 4.9,
-      reviews: 234,
-      socialRating: 950,
-      featured: true
-    },
-    {
-      id: 4,
-      name: 'Городские инициативы',
-      category: 'city',
-      members: 1650,
-      events: 6,
-      image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
-      location: 'Весь город',
-      description: 'Платформа для развития городских проектов и инициатив',
-      leader: {
-        name: 'Екатерина Смирнова',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80',
-        role: 'PRO-Соучастник'
-      },
-      rating: 4.7,
-      reviews: 156,
-      socialRating: 780,
-      featured: false
+  // Обработчик поиска
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1); // Сбрасываем страницу на первую при поиске
+  };
+
+  // Обработчик выбора типа клана
+  const handleTypeChange = (type: string) => {
+    if (selectedTypes.includes(type)) {
+      setSelectedTypes(selectedTypes.filter(t => t !== type));
+    } else {
+      setSelectedTypes([...selectedTypes, type]);
     }
-  ];
+    setPage(1);
+  };
 
-  const filteredClans = selectedCategory && selectedCategory !== 'all'
-    ? clans.filter(clan => clan.category === selectedCategory)
-    : clans;
+  // Обработчик выбора тегов
+  const handleTagChange = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter(t => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+    setPage(1);
+  };
 
-  const searchedClans = searchQuery
-    ? filteredClans.filter(clan =>
-        clan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        clan.description.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : filteredClans;
+  // Популярные теги для фильтрации
+  const popularTags = ['Походы', 'Спорт', 'Отдых', 'Творчество', 'Образование', 'Бизнес'];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Кланы и сообщества</h1>
-          <p className="text-xl text-gray-600">
-            Присоединяйтесь к единомышленникам и создавайте собственные сообщества
-          </p>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Кланы Сибири</h1>
+        
+        {authState.isAuthenticated && (authState.user?.role === 'pro' || authState.user?.role === 'admin') && (
+          <Link 
+            to="/clans/create" 
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Создать клан
+          </Link>
+        )}
+      </div>
+      
+      <div className="bg-white shadow rounded-lg p-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* Поиск */}
+          <div className="md:col-span-6">
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+              Поиск клана
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
               <input
                 type="text"
-                placeholder="Поиск кланов..."
+                id="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
+                placeholder="Название, описание или теги"
               />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
-            <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50">
-              <Filter className="h-5 w-5 mr-2" />
-              Фильтры
-            </button>
-            <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center">
-              <UserPlus className="h-5 w-5 mr-2" />
-              Создать клан
-            </button>
           </div>
-
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id === selectedCategory ? null : category.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-                  category.id === selectedCategory
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {category.name}
-              </button>
-            ))}
+          
+          {/* Тип клана */}
+          <div className="md:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Тип клана
+            </label>
+            <div className="flex space-x-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  value="open"
+                  checked={selectedTypes.includes('open')}
+                  onChange={() => handleTypeChange('open')}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Открытый</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  value="closed"
+                  checked={selectedTypes.includes('closed')}
+                  onChange={() => handleTypeChange('closed')}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Закрытый</span>
+              </label>
+            </div>
           </div>
-        </div>
-
-        {/* Featured Clans */}
-        <div className="mb-12">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Популярные кланы</h2>
-            <Link
-              to="/clans/featured"
-              className="text-indigo-600 hover:text-indigo-800 flex items-center"
-            >
-              Все популярные
-              <ChevronRight className="h-5 w-5 ml-1" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {searchedClans.filter(clan => clan.featured).map((clan) => (
-              <div
-                key={clan.id}
-                className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-105"
-              >
-                <Link to={`/clans/${clan.id}`}>
-                  <div className="relative h-48">
-                    <img
-                      src={clan.image}
-                      alt={clan.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
-                      <span className="text-sm font-medium text-gray-800">
-                        {categories.find(cat => cat.id === clan.category)?.name}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="flex items-center mb-4">
-                      <img
-                        src={clan.leader.avatar}
-                        alt={clan.leader.name}
-                        className="h-10 w-10 rounded-full"
-                      />
-                      <div className="ml-3">
-                        <h4 className="font-medium">{clan.leader.name}</h4>
-                        <p className="text-sm text-gray-500 flex items-center">
-                          <Crown className="h-4 w-4 text-yellow-400 mr-1" />
-                          {clan.leader.role}
-                        </p>
-                      </div>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{clan.name}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{clan.description}</p>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center text-gray-600">
-                        <MapPin className="h-5 w-5 mr-2" />
-                        <span className="text-sm">{clan.location}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-gray-600">
-                        <div className="flex items-center">
-                          <Users className="h-5 w-5 mr-2" />
-                          <span className="text-sm">{clan.members} участников</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Calendar className="h-5 w-5 mr-2" />
-                          <span className="text-sm">{clan.events} событий</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-gray-600">
-                        <div className="flex items-center">
-                          <Star className="h-5 w-5 text-yellow-400 fill-current mr-1" />
-                          <span className="text-sm">{clan.rating} ({clan.reviews})</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Trophy className="h-5 w-5 text-indigo-400 mr-1" />
-                          <span className="text-sm">{clan.socialRating} SR</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 flex space-x-3">
-                      <button className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-                        Вступить
-                      </button>
-                      <button className="flex-1 border border-indigo-600 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors">
-                        Подробнее
-                      </button>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* All Clans */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            {searchQuery ? 'Результаты поиска' : 'Все кланы'}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {searchedClans.map((clan) => (
-              <div
-                key={clan.id}
-                className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-105"
-              >
-                <Link to={`/clans/${clan.id}`}>
-                  <div className="relative h-48">
-                    <img
-                      src={clan.image}
-                      alt={clan.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
-                      <span className="text-sm font-medium text-gray-800">
-                        {categories.find(cat => cat.id === clan.category)?.name}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="flex items-center mb-4">
-                      <img
-                        src={clan.leader.avatar}
-                        alt={clan.leader.name}
-                        className="h-10 w-10 rounded-full"
-                      />
-                      <div className="ml-3">
-                        <h4 className="font-medium">{clan.leader.name}</h4>
-                        <p className="text-sm text-gray-500 flex items-center">
-                          <Crown className="h-4 w-4 text-yellow-400 mr-1" />
-                          {clan.leader.role}
-                        </p>
-                      </div>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{clan.name}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{clan.description}</p>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center text-gray-600">
-                        <MapPin className="h-5 w-5 mr-2" />
-                        <span className="text-sm">{clan.location}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-gray-600">
-                        <div className="flex items-center">
-                          <Users className="h-5 w-5 mr-2" />
-                          <span className="text-sm">{clan.members} участников</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Calendar className="h-5 w-5 mr-2" />
-                          <span className="text-sm">{clan.events} событий</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-gray-600">
-                        <div className="flex items-center">
-                          <Star className="h-5 w-5 text-yellow-400 fill-current mr-1" />
-                          <span className="text-sm">{clan.rating} ({clan.reviews})</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Trophy className="h-5 w-5 text-indigo-400 mr-1" />
-                          <span className="text-sm">{clan.socialRating} SR</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 flex space-x-3">
-                      <button className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-                        Вступить
-                      </button>
-                      <button className="flex-1 border border-indigo-600 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors">
-                        Подробнее
-                      </button>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
+          
+          {/* Теги */}
+          <div className="md:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Популярные теги
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {popularTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleTagChange(tag)}
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    selectedTags.includes(tag)
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
+                >
+                  {tag}
+                  {selectedTags.includes(tag) && <X className="h-3 w-3 ml-1" />}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
+      
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      ) : (
+        <>
+          {clans.length === 0 ? (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Кланы не найдены</h3>
+              <p className="text-gray-500 mb-6">Попробуйте изменить критерии поиска или создайте свой собственный клан</p>
+              {authState.isAuthenticated && (authState.user?.role === 'pro' || authState.user?.role === 'admin') && (
+                <Link 
+                  to="/clans/create" 
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Создать клан
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {clans.map((clan) => (
+                <ClanCard 
+                  key={clan._id} 
+                  clan={{
+                    _id: clan._id,
+                    name: clan.name,
+                    description: clan.description,
+                    logo: clan.logo || undefined,
+                    type: clan.type,
+                    leader: { name: clan.leader.name },
+                    members: clan.members.length,
+                    rating: clan.rating,
+                    tags: clan.tags,
+                    createdAt: clan.createdAt
+                  }} 
+                />
+              ))}
+            </div>
+          )}
+          
+          {/* Пагинация */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8">
+              <nav className="inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  type="button"
+                  disabled={page === 1}
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-l-md border text-sm font-medium ${
+                    page === 1
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="sr-only">Предыдущая</span>
+                  &laquo;
+                </button>
+                
+                {[...Array(totalPages)].map((_, i) => (
+                  <button
+                    key={i + 1}
+                    type="button"
+                    onClick={() => setPage(i + 1)}
+                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                      page === i + 1
+                        ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                
+                <button
+                  type="button"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-r-md border text-sm font-medium ${
+                    page === totalPages
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="sr-only">Следующая</span>
+                  &raquo;
+                </button>
+              </nav>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
